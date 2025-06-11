@@ -1,4 +1,3 @@
-
 import datarobot as dr
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions
@@ -295,10 +294,10 @@ def run():
     pipeline_options = PipelineOptions(
         runner='DataflowRunner',  # Change to 'DirectRunner' for local testing 'DataflowRunner'
         project=PROJECT_ID,
-        job_name = 'dr-train-models',
+        job_name = 'dr-train-joined-models',
         temp_location='gs://kw-ds-vertex-ai-test/temp',
         staging_location='gs://kw-ds-vertex-ai-test/staging',
-        template_location='gs://kw-ds-vertex-ai-test/templates/dr_train_models_template',
+        template_location='gs://kw-ds-vertex-ai-test/templates/dr_train_joined_models_template',
         setup_file='./dr_setup/setup.py',
         region='us-east1'
     )
@@ -307,60 +306,22 @@ def run():
 
 
     with beam.Pipeline(options=pipeline_options) as pipeline:
-        my_dataset_list = [
-                    'US_houses_2019', 'US_houses_not_sold_last',
-                   'US_condos_2019', 'US_condos_not_sold_last',
-                   'no_big_ma_combined', 'no_big_ma_combined_not_sold',
+        my_dataset_list = ['Hawaii_27980, 25900, 46520, 28180',  'Alaska_11260, 21820, 27940, 28540',
+        'Grand_rapids_24340, 26090', 'Oklahoma_36420, 46140, 44660, 43060',
+        'Indianapolis_26900, 14020, 18020', 'Punta_gorda_35840, 39460, 15980',
+         'Naples_keywest_34940, 28580',  'Richmond_40060', 'Columbus_18140',
+        'Washington_47900', 'Tucson_46060', 'Tampa_45300', 'Seattle_42660', 'Saint_louis_41180',
+        'San_francisco_41860',  'San_diego_41740', 'San_antonio_41700', 'Sacramento_40900',
+        'Riverside_40140', 'Raleigh_39580',  'Portland_38900', 'Pittsburgh_38300', 'Phoenix_38060',
+        'Philadelphia_37980', 'Orlando_36740', 'New_york_35620', 'Nashville_34980',
+        'Minneapolis_33460', 'Miami_fort_33100', 'Los_angeles_31080', 'Las_vegas_29820', 'Jacksonville_27260',
+        'Houston_26420', 'Fort_collins_22660', 'Detroit_19820', 'Denver_19740',
+        'Cleveland_17460', 'Colorado_springs_17820', 'Cincinnati_17140', 'Chicago_16980',
+        'Charlotte_16740', 'Baltimore_12580', 'Boston_14460', 'Atlanta_12060', 'Austin_12420',
+        'No_big_ma']
 
-         'Hawaii_27980, 25900, 46520, 28180_combined_not_sold',
-         'Alaska_11260, 21820, 27940, 28540_combined_not_sold', 'Grand_rapids_24340, 26090_combined_not_sold',
-         'Oklahoma_36420, 46140, 44660, 43060_combined_not_sold', 'Indianapolis_26900, 14020, 18020_combined_not_sold',
-         'Punta_gorda_35840, 39460, 15980_combined_not_sold', 'Naples_keywest_34940, 28580_combined_not_sold',
-         'Richmond_40060_combined_not_sold', 'Columbus_18140_combined_not_sold',
-         'Washington_47900_combined_not_sold', 'Tucson_46060_combined_not_sold',
-         'Tampa_45300_combined_not_sold', 'Seattle_42660_combined_not_sold',
-         'Saint_louis_41180_combined_not_sold', 'San_francisco_41860_combined_not_sold',
-         'San_diego_41740_combined_not_sold', 'San_antonio_41700_combined_not_sold',
-         'Sacramento_40900_combined_not_sold', 'Riverside_40140_combined_not_sold',
-         'Raleigh_39580_combined_not_sold', 'Portland_38900_combined_not_sold',
-         'Pittsburgh_38300_combined_not_sold', 'Phoenix_38060_combined_not_sold',
-         'Philadelphia_37980_combined_not_sold', 'Orlando_36740_combined_not_sold',
-         'New_york_35620_combined_not_sold', 'Nashville_34980_combined_not_sold',
-         'Minneapolis_33460_combined_not_sold', 'Miami_fort_33100_combined_not_sold',
-         'Los_angeles_31080_combined_not_sold', 'Las_vegas_29820_combined_not_sold',
-         'Jacksonville_27260_combined_not_sold', 'Houston_26420_combined_not_sold',
-         'Fort_collins_22660_combined_not_sold', 'Detroit_19820_combined_not_sold',
-         'Denver_19740_combined_not_sold',
-         'Cleveland_17460_combined_not_sold', 'Colorado_springs_17820_combined_not_sold',
-         'Cincinnati_17140_combined_not_sold', 'Chicago_16980_combined_not_sold',
-         'Charlotte_16740_combined_not_sold', 'Baltimore_12580_combined_not_sold',
-         'Boston_14460_combined_not_sold', 'Atlanta_12060_combined_not_sold',
-         'Austin_12420_combined_not_sold',
-         'Hawaii_27980, 25900, 46520, 28180_combined', 'Alaska_11260, 21820, 27940, 28540_combined',
-         'Grand_rapids_24340, 26090_combined', 'Oklahoma_36420, 46140, 44660, 43060_combined',
-         'Indianapolis_26900, 14020, 18020_combined', 'Punta_gorda_35840, 39460, 15980_combined',
-         'Naples_keywest_34940, 28580_combined', 'Richmond_40060_combined',
-         'Columbus_18140_combined', 'Washington_47900_combined',
-         'Tucson_46060_combined', 'Tampa_45300_combined',
-         'Seattle_42660_combined', 'Saint_louis_41180_combined',
-         'San_francisco_41860_combined', 'San_diego_41740_combined',
-         'San_antonio_41700_combined', 'Sacramento_40900_combined',
-         'Riverside_40140_combined', 'Raleigh_39580_combined',
-         'Portland_38900_combined', 'Pittsburgh_38300_combined',
-         'Phoenix_38060_combined', 'Philadelphia_37980_combined',
-         'Orlando_36740_combined', 'New_york_35620_combined',
-         'Nashville_34980_combined', 'Minneapolis_33460_combined',
-         'Miami_fort_33100_combined', 'Los_angeles_31080_combined',
-         'Las_vegas_29820_combined', 'Jacksonville_27260_combined',
-         'Houston_26420_combined', 'Fort_collins_22660_combined',
-         'Detroit_19820_combined', 'Denver_19740_combined', 'Cleveland_17460_combined',
-         'Colorado_springs_17820_combined', 'Cincinnati_17140_combined',
-         'Chicago_16980_combined', 'Charlotte_16740_combined',
-         'Baltimore_12580_combined', 'Boston_14460_combined',
-         'Atlanta_12060_combined', 'Austin_12420_combined'
-                           ]
         results = []
-        train_list = [elem for elem in my_dataset_list if ('photo_' not in elem) & ('_not_sold' not in elem)]  # len 79
+        train_list = [elem for elem in my_dataset_list if ('photo_' not in elem) & ('_not_sold' not in elem)]
         i = 0
         for DTS in train_list:
             results.append(
@@ -371,22 +332,3 @@ def run():
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
     run()
-
-
-# python dr_train_models_dataflow.py --worker_machine_type=e2-standard-4
-
-#
-# ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
-#
-# curl -X POST \
-#     -H "Authorization: Bearer $ACCESS_TOKEN" \
-#     -H "Content-Type: application/json" \
-#     -d '{
-#         "jobName": "dr-train-models-job",
-#         "parameters": {},
-#         "environment": {
-#             "tempLocation": "gs://kw-ds-vertex-ai-test/temp",
-#             "zone": "us-east1-b"
-#         }
-#     }' \
-#     "https://dataflow.googleapis.com/v1b3/projects/kw-data-science-playgorund/locations/us-east1/templates:launch?gcsPath=gs://kw-ds-vertex-ai-test/templates/dr_train_models_template"
