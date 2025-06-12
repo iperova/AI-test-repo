@@ -18,9 +18,8 @@ PROJECT_ID = 'kw-data-science-playgorund'
 
 
 class DRTrainModelDoFn(beam.DoFn):
-    def __init__(self, city, listing_type):
+    def __init__(self, city):
         self.city = city
-        self.listing_type = listing_type
 
         self.logger = logging.getLogger(__name__)
 
@@ -74,9 +73,7 @@ class DRTrainModelDoFn(beam.DoFn):
                                  'concrete_materials', 'cement_materials', 'no_roof_type',
                                  'other_construction_materials', 'stone_materials', 'detached_parking',
                                  ]
-        my_dataset_photo_list = ['Austin_combined_photo_not_sold', 'Austin_combined_photo',
-                   'Atlanta_combined_photo_not_sold', 'Atlanta_combined_photo',
-                   'Seattle_combined_photo_not_sold', 'Seattle_combined_photo']
+        my_dataset_photo_list = ['Austin_photo',  'Atlanta_photo',  'Seattle_photo']
 
         month_dict = {'01_2025': 'Jan_2025',
                       '02_2025': 'Feb_2025',
@@ -201,27 +198,18 @@ class DRTrainModelDoFn(beam.DoFn):
             return None  # Return None if no matching project is found
 
 
-        def project_photo_train(CITY, LISTING_TYPE):
+        def project_photo_train(CITY):
 
-            if LISTING_TYPE == '':
-                PROJECT_NAME = f'{CITY.capitalize()}_photo_{month_dict.get(DATE)}'
-            else:
-                PROJECT_NAME = f'{CITY.capitalize()}_{LISTING_TYPE}_photo_{month_dict.get(DATE)}'
+
+            PROJECT_NAME = f'{CITY.capitalize()}_photo_{month_dict.get(DATE)}'
 
             logging.info('Determining dataset ID')
             dataset_names = {ds.name: ds.id for ds in dr.Dataset.list() if ds.name in my_dataset_photo_list}
             for dataset_name in dataset_names.keys():
-                if LISTING_TYPE != '':
-                    if (CITY.capitalize() in dataset_name) & (LISTING_TYPE in dataset_name) & (
-                            'not_sold' not in dataset_name) & ('photo' in dataset_name):
-                        logging.info(f'Dataset name:{dataset_name}')
-                        DATASET_ID_PHOTOS = dataset_names.get(dataset_name)
-                else:
-                    if (CITY.capitalize() in dataset_name) & ('houses' not in dataset_name) & (
-                            'condos' not in dataset_name) \
-                            & ('not_sold' not in dataset_name) & ('photo' in dataset_name):
-                        logging.info(f'Dataset name:{dataset_name}')
-                        DATASET_ID_PHOTOS = dataset_names.get(dataset_name)
+                if (CITY.capitalize() in dataset_name)  & ('not_sold' not in dataset_name) & ('photo' in dataset_name):
+                    logging.info(f'Dataset name:{dataset_name}')
+                    DATASET_ID_PHOTOS = dataset_names.get(dataset_name)
+
 
             logging.info(f'dataset ID was determined: {DATASET_ID_PHOTOS}')
             # # ------------------------------------ Choose or create project (no photos) ----------------------------------------#
@@ -285,28 +273,26 @@ class DRTrainModelDoFn(beam.DoFn):
                     sample_pct=96  # % of dataset to train
                 )
 
-            return logging.info(f'Finished {CITY}, {LISTING_TYPE}')
+            return logging.info(f'Finished {CITY}')
 
         token = vault_get_data_robot_personal_key()
         # logging.info(token)
         endpoint = 'https://app.datarobot.com/api/v2'
         client = dr.Client(endpoint=endpoint, token=token)
 
-        project_photo_train(self.city, self.listing_type)
+        project_photo_train(self.city)
 
-        return print(f"{self.city}-{self.listing_type} training starts!!!")
+        return print(f"{self.city} training starts!!!")
 
 class ProcessDataset(beam.PTransform):
-    def __init__(self, city, listing_type):
+    def __init__(self, city):
         self.city = city
-        self.listing_type = listing_type
 
     def expand(self, pcoll):
         return (
             pcoll
-            | f"Empty task for {self.city}-{self.listing_type}" >> beam.Create([None])
-            | f"Train model for {self.city}-{self.listing_type}" >> beam.ParDo(DRTrainModelDoFn(self.city,
-                                                                                                self.listing_type))
+            | f"Empty task for {self.city}" >> beam.Create([None])
+            | f"Train model for {self.city}" >> beam.ParDo(DRTrainModelDoFn(self.city))
         )
 
 def run():
@@ -315,10 +301,10 @@ def run():
     pipeline_options = PipelineOptions(
         runner='DataflowRunner',  # Change to 'DirectRunner' for local testing 'DataflowRunner'
         project=PROJECT_ID,
-        job_name = 'dr-train-photomodels',
+        job_name = 'dr-train-joined-photomodels',
         temp_location='gs://kw-ds-vertex-ai-test/temp',
         staging_location='gs://kw-ds-vertex-ai-test/staging',
-        template_location='gs://kw-ds-vertex-ai-test/templates/dr_train_photomodels_template',
+        template_location='gs://kw-ds-vertex-ai-test/templates/dr_train_joined_photomodels_template',
         setup_file='./dr_setup/setup.py',
         region='us-east1'
     )
@@ -328,36 +314,13 @@ def run():
 
     with beam.Pipeline(options=pipeline_options) as pipeline:
         city_list = ['austin', 'atlanta', 'seattle']
-
-        # listing_type_list = ['houses', 'condos']
-
         results = []
         for CITY in city_list:
-            # for LISTING_TYPE in listing_type_list:
             results.append(
                 pipeline
-            | f"Process {CITY}" >> ProcessDataset(city=CITY, listing_type='')
+            | f"Process {CITY}" >> ProcessDataset(city=CITY)
             )
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
     run()
-
-
-# python dr_train_photomodels_dataflow.py --worker_machine_type=e2-standard-4
-
-#
-# ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
-#
-# curl -X POST \
-#     -H "Authorization: Bearer $ACCESS_TOKEN" \
-#     -H "Content-Type: application/json" \
-#     -d '{
-#         "jobName": "dr-train-photomodels-job",
-#         "parameters": {},
-#         "environment": {
-#             "tempLocation": "gs://kw-ds-vertex-ai-test/temp",
-#             "zone": "us-east1-b"
-#         }
-#     }' \
-#     "https://dataflow.googleapis.com/v1b3/projects/kw-data-science-playgorund/locations/us-east1/templates:launch?gcsPath=gs://kw-ds-vertex-ai-test/templates/dr_train_photomodels_template"
