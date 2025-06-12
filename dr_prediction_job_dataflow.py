@@ -187,7 +187,6 @@ class DRPredictionJobDoFn(beam.DoFn):
                 'bucket': 'kw-ds-vertex-ai-test',  # 'kw-data-science-dev',
                 # Google Cloud Storage (GS) name where interim results will be written
                 'credential_id': credential_id_write_to_gs
-                # '63d95eddaf47b386a15f57fa'  # cred.credential_id for Write-to-GCS
             },
             passthrough_columns=['listing_id', 'close_dt']
         )
@@ -230,7 +229,6 @@ def run():
     MONTH = datetime.now().month
 
     with beam.Pipeline(options=pipeline_options) as pipeline:
-        # if MONTH in [2, 3, 5, 6, 8, 9, 11, 12]:
         results = []
         for housing_type in housing_type_list:
             results.append(
@@ -239,28 +237,7 @@ def run():
                     housing_type=housing_type
                 )
             )
-        # elif MONTH in [1, 4, 7, 10]:
-        #     pipeline | f"Empty pipeline" >> beam.Create([None])
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
     run()
-
-
-# python dr_prediction_job_dataflow.py --worker_machine_type=e2-standard-4
-
-#
-# ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
-#
-# curl -X POST \
-#     -H "Authorization: Bearer $ACCESS_TOKEN" \
-#     -H "Content-Type: application/json" \
-#     -d '{
-#         "jobName": "dr-prediction-job-",
-#         "parameters": {},
-#         "environment": {
-#             "tempLocation": "gs://kw-ds-vertex-ai-test/temp",
-#             "zone": "us-east1-b"
-#         }
-#     }' \
-#     "https://dataflow.googleapis.com/v1b3/projects/kw-data-science-playgorund/locations/us-east1/templates:launch?gcsPath=gs://kw-ds-vertex-ai-test/templates/dr_predition_job_template"
