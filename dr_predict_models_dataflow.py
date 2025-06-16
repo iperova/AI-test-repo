@@ -29,6 +29,22 @@ logger.info("Starting the script...")
 
 PROJECT_ID = 'kw-data-science-playgorund'
 
+month_dict = {'01_2025': 'Jan_2025',
+              '02_2025': 'Feb_2025',
+              '03_2025': 'Mar_2025',
+              '04_2025': 'Apr_2025',
+              '05_2025': 'May_2025',
+              '06_2025': 'Jun_2025',
+              '07_2025': 'Jul_2025',
+              '08_2025': 'Aug_2025',
+              '09_2025': 'Sep_2025',
+              '10_2025': 'Oct_2025',
+              '11_2025': 'Nov_2025',
+              '12_2025': 'Dec_2025'}
+DATE = datetime.today().strftime('%m_%Y')
+MONTH = month_dict.get(DATE)
+logging.info(f'Month: {MONTH}')
+
 #########################################################
 
 
@@ -111,24 +127,32 @@ class DRPredictModelDoFn(beam.DoFn):
                 # else:
                 DTS = PROJECT_NAME.split(f'_{month_year}')[0]
                 DATASET_NAME = f'{DTS}_not_sold'
-                dataset_names = {ds.name: ds.id for ds in dr.Dataset.list() if ds.name == DATASET_NAME}
-                DATASET_ID = dataset_names.get(DATASET_NAME)
+                DATASET_NONZEROS_NAME = f'{DTS}_not_sold_nonzeros'
 
-                if DATASET_ID != None:
-                    logging.info(f'Dataset ID: {DATASET_ID}')
+                dataset_names = {ds.name: ds.id for ds in dr.Dataset.list() if ds.name in [DATASET_NAME,
+                                                                                           DATASET_NONZEROS_NAME]}
+                DATASET_ID = dataset_names.get(DATASET_NAME)
+                DATASET_NONZEROS_ID = dataset_names.get(DATASET_NONZEROS_NAME)
+
+                if (DATASET_ID != None) & (DATASET_NONZEROS_ID != None):
+                    logging.info(f'Dataset ID: {DATASET_ID}, Dataset nonzeros ID: {DATASET_NONZEROS_ID}')
 
                     if len(project.get_datasets()) == 0:
                         logging.info(f'Uploading new dataset...')
                         new_dataset = project.upload_dataset_from_catalog(dataset_id=DATASET_ID)
+                        new_nonzeros_dataset = project.upload_dataset_from_catalog(dataset_id=DATASET_NONZEROS_ID)
                     else:
                         logging.info(f'List of uploaded datasets:{project.get_datasets()}')
                         new_dataset = project.get_datasets()[0]
-                    logging.info('Dataset was found')
+                        new_nonzeros_dataset = project.get_datasets()[1]
+                    logging.info('Datasets were found')
 
+
+                    best_model.request_predictions(dataset=new_dataset)
+                    best_model.request_predictions(dataset=new_nonzeros_dataset)
                     best_model.request_feature_effect()
-                    prediction_job = best_model.request_predictions(dataset=new_dataset)
 
-                    logging.info('Request prediction was started')
+                    logging.info('Request predictions were started')
                     STRING_TO_RETURN = f"Request prediction was started"
                 else:
                     logging.info(f"DataSet wasn't found with the name: {DATASET_NAME}")
@@ -168,10 +192,10 @@ def run():
     pipeline_options = PipelineOptions(
         runner='DataflowRunner',  # Change to 'DirectRunner' for local testing 'DataflowRunner'
         project=PROJECT_ID,
-        job_name = 'dr-predict-models',
+        job_name = 'dr-predict-joined-models',
         temp_location='gs://kw-ds-vertex-ai-test/temp',
         staging_location='gs://kw-ds-vertex-ai-test/staging',
-        template_location='gs://kw-ds-vertex-ai-test/templates/dr_predict_models_template',
+        template_location='gs://kw-ds-vertex-ai-test/templates/dr_predict_joined_models_template',
         setup_file='./dr_setup/setup.py',
         region='us-east1'
     )
@@ -180,21 +204,6 @@ def run():
 
 
     with beam.Pipeline(options=pipeline_options) as pipeline:
-
-        month_dict = {'01_2025': 'Jan_2025',
-                      '02_2025': 'Feb_2025',
-                      '03_2025': 'Mar_2025',
-                      '04_2025': 'Apr_2025',
-                      '05_2025': 'May_2025',
-                      '06_2025': 'Jun_2025',
-                      '07_2025': 'Jul_2025',
-                      '08_2025': 'Aug_2025',
-                      '09_2025': 'Sep_2025',
-                      '10_2025': 'Oct_2025',
-                      '11_2025': 'Nov_2025',
-                      '12_2025': 'Dec_2025'}
-        DATE = datetime.today().strftime('%m_%Y')
-        MONTH = month_dict.get(DATE)
 
         VAULT_URL = "https://prod.vault.kw.com"
         VAULT_ROLE = "gcp-role-prod-eim"
@@ -301,8 +310,11 @@ def run():
 
         results = []
         project_list = [pr.project_name for pr in dr.Project.list() if (MONTH in pr.project_name) &
-                        ('photo' not in pr.project_name) & ('combined' in pr.project_name)
-                        & (pr.holdout_unlocked == True)]
+                        ('photo' not in pr.project_name) & ('combined' not in pr.project_name) &
+                        (pr.holdout_unlocked == True) & ('houses' not in pr.project_name) &
+                        ('condos' not in pr.project_name)]
+
+        logging.info(f'Project list: {project_list}')
 
         # project_list = [pr.project_name for pr in dr.Project.list() if (MONTH in pr.project_name) &
         #                 ('photo' not in pr.project_name) & (pr.holdout_unlocked==True) &
@@ -327,22 +339,3 @@ def run():
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
     run()
-
-
-# python dr_predict_models_dataflow.py --worker_machine_type=e2-standard-4
-
-#
-# ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
-#
-# curl -X POST \
-#     -H "Authorization: Bearer $ACCESS_TOKEN" \
-#     -H "Content-Type: application/json" \
-#     -d '{
-#         "jobName": "dr-predict-models-job",
-#         "parameters": {},
-#         "environment": {
-#             "tempLocation": "gs://kw-ds-vertex-ai-test/temp",
-#             "zone": "us-east1-b"
-#         }
-#     }' \
-#     "https://dataflow.googleapis.com/v1b3/projects/kw-data-science-playgorund/locations/us-east1/templates:launch?gcsPath=gs://kw-ds-vertex-ai-test/templates/dr_predict_models_template"
